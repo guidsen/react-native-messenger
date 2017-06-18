@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Realtime chat</title>
+    <script src="http://js.pusher.com/4.0/pusher.min.js"></script>
+  </head>
+  <body>
+    <input type="text" id="message-text" />
+    <button type="submit" id="submit-text">Submit text!</button>
+    <div id="is-typing"></div>
+    <ul id="message-list">
+    </ul>
+    <script>
+      var pusher = new Pusher("PUSHER_APP_KEY", {
+        authEndpoint: "SERVER_URL",
+        cluster: 'eu',
+        auth: {
+          params: {
+            userId: 2,
+          },
+        }
+      });
+
+      var channel = pusher.subscribe('presence-conversation');
+      const $submitText = document.getElementById('submit-text');
+      const $list = document.getElementById('message-list');
+      const $isTyping = document.getElementById('is-typing');
+      const $messageText = document.getElementById('message-text');
+
+      channel.bind('pusher:subscription_succeeded', function (members) {
+        channel.bind('client-start-typing', (data) => {
+          const typingUser = members.members[data.userId] || { name: 'Onbekend' };
+          $isTyping.innerText = `${typingUser.name} is aan het typen...`;
+        });
+
+        channel.bind('client-end-typing', (data) => {
+          $isTyping.innerText = '';
+        });
+      });
+
+      channel.bind('client-new-message', (data) => {
+        if (data.userId === 2) return;
+
+        const $listItem = document.createElement('li');
+        $listItem.appendChild(document.createTextNode(data.text));
+        $list.appendChild($listItem);
+      });
+
+      $submitText.addEventListener('click', (event) => {
+        channel.trigger('client-end-typing', {
+          userId: 2,
+        });
+
+        channel.trigger('client-new-message', {
+          userId: 2,
+          text: $messageText.value,
+        });
+      });
+
+      $messageText.addEventListener('focus', () => {
+        channel.trigger('client-start-typing', {
+          userId: 2,
+        });
+      });
+
+      $messageText.addEventListener('focusout', () => {
+        channel.trigger('client-end-typing', {
+          userId: 2,
+        });
+      })
+    </script>
+  </body>
+</html>
